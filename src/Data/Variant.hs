@@ -7,6 +7,7 @@
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GADTs                  #-}
+{-# LANGUAGE InstanceSigs           #-}
 {-# LANGUAGE LambdaCase             #-}
 {-# LANGUAGE PolyKinds              #-}
 {-# LANGUAGE RankNTypes             #-}
@@ -16,6 +17,7 @@
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE TypeOperators          #-}
 {-# LANGUAGE UndecidableInstances   #-}
+{-# LANGUAGE InstanceSigs #-}
 
 {-|
 Module      : Data.Variant
@@ -76,24 +78,14 @@ module Data.Variant
     -- * Void conversions
   ,  preposterous
   , postposterous
-
-    -- * MTL/transformer utilities
-  , catchFM
-  , catchM
-
-  , throwFM
-  , throwM
   ) where
 
-import Control.Monad.Error.Class (MonadError (..))
-import Control.Monad.Trans.Except (ExceptT, mapExceptT, runExceptT)
 import Data.Bifunctor (first)
 import Data.Function ((&))
 import Data.Functor.Identity (Identity (..))
 import Data.Kind (Constraint, Type)
 import Data.Void (Void, absurd)
 import GHC.TypeLits (ErrorMessage (..), TypeError)
-import Test.QuickCheck.Arbitrary (Arbitrary (..))
 
 -- | The type @VariantF f '[x, y, z]@ is /either/ @f x@, @f y@, or @f z@. The
 -- We construct these with @Here@, @There . Here@, and @There . There . Here@
@@ -114,10 +106,6 @@ data VariantF (f :: k -> Type) (xs :: [k]) where
 type family AllF (c :: Type -> Constraint) (f :: k -> Type) (xs :: [k]) :: Constraint where
   AllF c f '[     ]  = ()
   AllF c f (x ': xs) = (c (f x), AllF c f xs)
-
-instance (EithersF f xs nested, Arbitrary nested)
-    => Arbitrary (VariantF f xs) where
-  arbitrary = fmap fromEithersF arbitrary
 
 deriving instance AllF Eq   f xs => Eq   (VariantF f xs)
 deriving instance AllF Show f xs => Show (VariantF f xs)
@@ -253,16 +241,34 @@ type family TypeNotFound (x :: k) :: l where
 -- ...
 class CouldBeF (xs :: [k]) (x :: k) where
   throwF :: f x -> VariantF f xs
+  snatchF :: VariantF f xs -> Either (VariantF f xs) (f x)
 
 instance CouldBeF (x ': xs) x where
   throwF = Here
+  snatchF = \case
+    Here  x  -> Right x
+    There xs -> Left (There xs)
+
+-- instance {-# INCOHERENT #-} (y ~ z, CatchF x xs ys)
+--     => CatchF x (y ': xs) (z ': ys) where
+--   catchF = \case
+--     There xs -> first There (catchF xs)
+--     Here  _  ->
+--       error $ "Impossible case - something isn't happy when performing the "
+--            <> "exhaustivity check as this case shouldn't need a pattern-match."
 
 instance {-# OVERLAPPABLE #-} CouldBeF xs x
     => CouldBeF (y ': xs) x where
   throwF = There . throwF
+  snatchF = \case
+    There xs -> first There (snatchF xs)
+    Here  _  ->
+      error $ "Impossible case - something isn't happy when performing the "
+           <> "exhaustivity check as this case shouldn't need a pattern-match."
 
 instance TypeNotFound x => CouldBeF '[] x where
   throwF = error "Impossible!"
+  snatchF = error "Impossible!"
 
 -- | Just as with 'CouldBeF', we can "throw" values /not/ in a functor context
 -- into a regular 'Variant'.
@@ -274,9 +280,11 @@ instance TypeNotFound x => CouldBeF '[] x where
 -- There (There (There (Here (Identity "Woo!"))))
 class CouldBeF xs x => CouldBe (xs :: [Type]) (x :: Type) where
   throw :: x -> Variant xs
+  snatch :: Variant xs -> Either (Variant xs) x
 
 instance CouldBeF xs x => CouldBe xs x where
   throw = throwF . Identity
+  snatch = fmap runIdentity . snatchF
 
 type family All (cs :: [Constraint]) = (c :: Constraint) | c -> cs where
   All  '[] = ()
@@ -399,8 +407,6 @@ instance CatchF x xs ys => Catch x xs ys where
 -- @Either a (Either b c)@: should this translate to @Variant '[a, b, c]@ or
 -- @Variant '[a, Either b c]@? There's not a unique mapping in this direction,
 -- so we can't add the functional dependency.
---
--- prop> fromEithersF (toEithersF x) == (x :: VariantF Maybe '[Int, String])
 class EithersF (f :: Type -> Type) (xs :: [Type]) (o :: Type)
     | f xs -> o, o f -> xs where
   toEithersF   :: VariantF f xs -> o
@@ -426,8 +432,6 @@ instance (Functor f, EithersF f (y ': xs) zs)
 --   :: Variant '[String, Int, Bool] -> Either [Char] (Either Int Bool)
 --
 -- The round-tripping property is also conserved:
---
--- prop> fromEithers (toEithers x) == (x :: Variant '[Int, String, Bool])
 class Eithers (xs :: [Type]) (o :: Type) | xs -> o where
   toEithers   :: Variant xs -> o
   fromEithers :: o -> Variant xs
@@ -488,100 +492,3 @@ preposterous = \case
 -- | ... and it also means we can convert back!
 postposterous :: Void -> VariantF f '[]
 postposterous = \case
-
--- | When working in some monadic context, using 'catch' becomes trickier. The
--- intuitive behaviour is that each 'catch' shrinks the variant in the left
--- side of my 'MonadError', but this is therefore type-changing: as we can only
--- 'throwError' and 'catchError' with a 'MonadError' type, this is impossible!
---
--- To get round this problem, we have to specialise to 'ExceptT', which allows
--- us to map over the error type and change it as we go. If the error we catch
--- is the one in the variant that we want to handle, we pluck it out and deal
--- with it. Otherwise, we "re-throw" the variant minus the one we've handled.
-catchFM
-  :: forall x e e' f m a
-   . ( Monad m
-     , CatchF x e e'
-     )
-  =>         ExceptT (VariantF f e ) m a
-  -> (f x -> ExceptT (VariantF f e') m a)
-  ->         ExceptT (VariantF f e') m a
-
-catchFM xs recover = mapExceptT (>>= go) xs
-  where
-    go = \case
-      Right success -> pure (Right success)
-      Left  failure -> case catchF @x failure of
-        Right hit  -> runExceptT (recover hit)
-        Left  miss -> pure (Left miss)
-
--- | Just the same as 'catchFM', but specialised for our plain 'Variant' and
--- sounding much less like a radio station.
-catchM
-  :: forall x e e' m a
-   . ( Monad m
-     , Catch x e e'
-     )
-  =>       ExceptT (Variant e ) m a
-  -> (x -> ExceptT (Variant e') m a)
-  ->       ExceptT (Variant e') m a
-
-catchM xs recover
-  = catchFM xs (recover . runIdentity)
-
--- | Throw an error into a variant 'MonadError' context. Note that this /isn't/
--- type-changing, so this can work for any 'MonadError', rather than just
--- 'ExceptT'.
-throwFM :: (MonadError (VariantF f e) m, e `CouldBe` x) => f x -> m a
-throwFM = throwError . throwF
-
--- | Same as 'throwFM', but without the @f@ context. Given a value of some type
--- within a 'Variant' within a 'MonadError' context, "throw" the error.
-throwM :: (MonadError (Variant e) m, e `CouldBe` x) => x -> m a
-throwM = throwFM . Identity
-
--- | Worked example:
---
--- >>> :set -XBlockArguments -XLambdaCase
--- >>> import Control.Monad.IO.Class (liftIO)
---
--- Let's declare some error types for our example app:
---
--- >>> data NetworkError      = NetworkError
--- >>> data UserNotFoundError = UserNotFoundError
---
--- Now these are in place, we can write a bit of business logic. This is
--- extremely contrived, but hopefully illustrates the point: we have a function
--- in which a number of things might go wrong!
---
--- >>> :{
--- getUser
---   :: ( e `CouldBe` NetworkError
---      , e `CouldBe` UserNotFoundError
---      )
---   => String
---   -> ExceptT (Variant e) IO String
--- getUser = \case
---   "Alice" -> throwM NetworkError
---   "Tom"   -> pure "Hi, Tom!"
---   _       -> throwM UserNotFoundError
--- :}
---
--- When we come to render a user's profile, we can deal with a missing user. If
--- something went wrong with the network, though, we'll handle that further up
--- the call stack:
---
--- >>> :{
--- renderProfile
---   :: e `CouldBe` NetworkError -- No mention of @UserNotFoundError@!
---   => String
---   -> ExceptT (Variant e) IO ()
--- renderProfile username = do
---   name <- catchM @UserNotFoundError (getUser username) \_ -> do
---     liftIO (putStrLn "ERROR! USER NOT FOUND. Defaulting to 'guest'.")
---     pure "Hello, mysterious stranger!"
---   liftIO (putStrLn name)
--- :}
---
--- Notice that the @UserNotFoundError@ constraint has disappeared! By using
--- 'catchM', we have /dispatched/ this constraint!
