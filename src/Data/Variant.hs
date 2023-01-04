@@ -88,6 +88,7 @@ import Data.Functor.Identity (Identity (..))
 import Data.Kind (Constraint, Type)
 import Data.Void (Void, absurd)
 import GHC.TypeLits (ErrorMessage (..), TypeError)
+import Test.QuickCheck.Arbitrary (Arbitrary (..))
 
 -- | The type @VariantF f '[x, y, z]@ is /either/ @f x@, @f y@, or @f z@. The
 -- We construct these with @Here@, @There . Here@, and @There . There . Here@
@@ -493,3 +494,6 @@ preposterous = \case
 -- | ... and it also means we can convert back!
 postposterous :: Void -> VariantF f '[]
 postposterous = \case
+
+instance (EithersF f xs nested, Arbitrary nested) => Arbitrary (VariantF f xs) where
+  arbitrary = fmap fromEithersF arbitrary

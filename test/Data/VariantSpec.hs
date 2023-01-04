@@ -5,7 +5,6 @@
 
 module Data.VariantSpec (spec) where
 
-import Data.Variant.Gen ()
 import HaskellWorks.Hspec.Hedgehog (require)
 import Hedgehog ((===), forAll, property)
 import Test.Hspec (describe, it, Spec)
