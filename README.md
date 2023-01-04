@@ -163,3 +163,7 @@ This library gives us all the benefits of Haskell's type system, forcing us to
 be explicit about all the possible errors we encounter, but doesn't force us to
 stick to a concrete error stack throughout. Our code is less fragile, our
 functions are decoupled, and error-handling is actually bearable!
+
+## Credits
+
+This library is heavily based on the original [oops library](https://github.com/i-am-tom/oops) by Tom Harding. 
