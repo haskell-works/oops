@@ -43,21 +43,12 @@ common project-config
 library
   import:               base, project-config,
                         mtl,
+                        QuickCheck,
                         transformers,
   exposed-modules:      Control.Monad.Oops
                         Control.Monad.Oops.Classic
                         Data.Variant
   hs-source-dirs:       src
-  default-language:     Haskell2010
-
-library gen
-  import:               base, project-config,
-                        QuickCheck,
-                        mtl,
-                        transformers,
-  exposed-modules:      Data.Variant.Gen
-  hs-source-dirs:       gen
-  build-depends:        oops
   default-language:     Haskell2010
 
 test-suite doctest
@@ -97,6 +88,5 @@ test-suite test
   main-is:              Spec.hs
   hs-source-dirs:       test
   default-language:     Haskell2010
-  build-depends:        oops,
-                        oops:gen
+  build-depends:        oops
   other-modules:        Data.VariantSpec
