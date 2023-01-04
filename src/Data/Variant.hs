@@ -17,7 +17,6 @@
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE TypeOperators          #-}
 {-# LANGUAGE UndecidableInstances   #-}
-{-# LANGUAGE InstanceSigs #-}
 
 {-|
 Module      : Data.Variant
@@ -40,9 +39,12 @@ Just as @Left 3@ and @Right True@ are of type @Either Int Bool@, we can write
 wrappers). We can think of the 'Here' and 'There' constructors as an "index":
 the index of the type we're storing is the number of occurrences of 'There'.
 
->>> :t [ Here (Identity 3), There (There (Here (Identity True))) ]
-[ Here (Identity 3), There (There (Here (Identity True))) ]
-  :: Num x1 => [VariantF Identity (x1 : x2 : Bool : xs)]
+$setup
+>>> :set -XTypeOperators -XDataKinds -XTypeApplications
+
+> > > :t [ Here (Identity 'a'), There (There (Here (Identity True))) ]
+[ Here (Identity 'a'), There (There (Here (Identity True))) ]
+  :: [VariantF Identity (Char : x : Bool : xs)]
 -}
 module Data.Variant
   ( -- * Generalised coproducts
@@ -96,7 +98,7 @@ import GHC.TypeLits (ErrorMessage (..), TypeError)
 -- types, preferring instead to describe it with constraints. See the methods
 -- below for more information!
 --
--- >>> :t [ Here (pure "Hello"), There (Here (pure True)) ]
+-- > > > :t [ Here (pure "Hello"), There (Here (pure True)) ]
 -- [ Here (pure "Hello"), There (Here (pure True)) ]
 --   :: Applicative f => [VariantF f ([Char] : Bool : xs)]
 data VariantF (f :: k -> Type) (xs :: [k]) where
@@ -174,10 +176,10 @@ instance CaseF (y ': zs) f r ((f y -> r) -> o)
 --
 -- This function specialises depending on the variant provided:
 --
--- >>> :t caseF (throw True :: Variant '[Bool])
+-- > > > :t caseF (throw True :: Variant '[Bool])
 -- caseF (throw True :: Variant '[Bool]) :: (Identity Bool -> r) -> r
 --
--- >>> :t caseF (throwF (pure True) :: VariantF IO '[Int, Bool])
+-- > > > :t caseF (throwF (pure True) :: VariantF IO '[Int, Bool])
 -- caseF (throwF (pure True) :: VariantF IO '[Int, Bool])
 --   :: (IO Int -> o) -> (IO Bool -> o) -> o
 caseF :: CaseF xs f r fold => VariantF f xs -> fold
@@ -200,15 +202,14 @@ instance Case (y ': zs) r ((y -> r) -> o)
 -- | Same as 'caseF', but without the functor wrappers. Again, this function
 -- will specialise according to the provided variant:
 --
--- >>> :t case_ (throw True :: Variant '[Bool, Int])
+-- > > > :t case_ (throw True :: Variant '[Bool, Int])
 -- case_ (throw True :: Variant '[Bool, Int])
 --   :: (Bool -> o) -> (Int -> o) -> o
 --
 -- You can also use @TypeApplications@ to check the specialisation for a
 -- particular variant:
 --
--- >>> :set -XTypeApplications
--- >>> :t case_ @'[Int, Bool, String]
+-- > > > :t case_ @'[Int, Bool, String]
 -- case_ @'[Int, Bool, String]
 --   :: Variant '[Int, Bool, String]
 --      -> (Int -> o) -> (Bool -> o) -> ([Char] -> o) -> o
@@ -393,7 +394,7 @@ instance CatchF x xs ys => Catch x xs ys where
 -- whatever reason. For that situation the functions here allow you to swap
 -- between the two representations.
 --
--- >>> :t toEithersF @IO @'[String, Int, Bool]
+-- > > > :t toEithersF @IO @'[String, Int, Bool]
 -- toEithersF @IO @'[String, Int, Bool]
 --   :: VariantF IO '[String, Int, Bool]
 --      -> Either (IO [Char]) (Either (IO Int) (IO Bool))
@@ -427,7 +428,7 @@ instance (Functor f, EithersF f (y ': xs) zs)
 -- | The @f@-less analogue of 'EithersF'. The same properties as described
 -- above will hold, with the same issues around 'fromEithers' result inference.
 --
--- >>> :t toEithers @'[String, Int, Bool]
+-- > > > :t toEithers @'[String, Int, Bool]
 -- toEithers @'[String, Int, Bool]
 --   :: Variant '[String, Int, Bool] -> Either [Char] (Either Int Bool)
 --

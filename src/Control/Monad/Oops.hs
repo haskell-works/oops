@@ -137,7 +137,10 @@ throwM :: forall x e m a. ()
 throwM = throwFM . Identity
 
 -- | Add 'ExceptT (Variant '[])' to the monad transformer stack.
-runOops :: Monad m => ExceptT (Variant '[]) m a -> m a
+runOops :: ()
+  => Monad m
+  => ExceptT (Variant '[]) m a
+  -> m a
 runOops f = either (absurd . preposterous) pure =<< runExceptT f
 
 -- | Suspend the 'ExceptT` monad transformer from the top of the stack so that the
