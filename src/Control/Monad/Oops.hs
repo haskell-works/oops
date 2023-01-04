@@ -40,6 +40,13 @@ module Control.Monad.Oops
     recoverM,
     recoverOrVoidM,
 
+    DV.CouldBeF (..),
+    DV.CouldBe  (..),
+    DV.CouldBeAnyOfF,
+    DV.CouldBeAnyOf,
+    DV.Variant,
+    DV.VariantF(..),
+
   ) where
 
 import Control.Monad.Error.Class (MonadError (..))
@@ -51,7 +58,8 @@ import Data.Functor.Identity (Identity (..))
 import Data.Variant (Catch, CatchF(..), CouldBe, CouldBeF(..), Variant, VariantF, preposterous)
 import Data.Void (Void, absurd)
 
-import qualified System.Exit as IO
+import qualified Data.Variant as DV
+import qualified System.Exit  as IO
 
 -- | When working in some monadic context, using 'catch' becomes trickier. The
 -- intuitive behaviour is that each 'catch' shrinks the variant in the left
