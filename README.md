@@ -144,11 +144,15 @@ Now, let's say we're calling this from another function that does some more
 contrived business logic:
 
 ```haskell
-renderProfile :: e `CouldBe` NetworkError => ExceptT (Variant e) IO ()
-renderProfile = do
-  name <- catchM @UserNotFoundError getUser \_ -> do
-    liftIO (putStrLn "ERROR! USER NOT FOUND. Defaulting to 'Alice'.")
+import Control.Monad.Oops.Classic
 
+renderProfile :: ()
+  => e `CouldBe` NetworkError
+  => Text
+  -> ExceptT (Variant e) IO ()
+renderProfile username = do
+  name <- catchM @UserNotFoundError (getUser username) $ \_ -> do
+    liftIO (putStrLn "ERROR! USER NOT FOUND. Defaulting to 'Alice'.")
     pure "Alice"
 
   liftIO (putStrLn name)
@@ -158,6 +162,34 @@ Here, we've tried to call `getUser`, and handled the `UserNotFoundError`
 explicitly. You'll notice that, as a result, _this_ signature doesn't mention
 it! Thanks to some careful instance trickery, a `CouldBe` and a `Catch`
 constraint will actually cancel each other out!
+
+The non-classic version of `catchM` takes the handler first which us to
+use a combination of `(&)`, `do` and `BlockArguments` do stack handlers
+like this:
+
+```haskell
+{-# LANGUAGE BlockArguments #-}
+
+import Control.Monad.Oops
+
+renderProfile :: ()
+  => Monad m
+  => es `CouldBe` NetworkError
+  => es `CouldBe` InvalidPassword
+  => Text
+  -> Text
+  -> ExceptT (Variant es) IO ()
+renderProfile username password = do
+  name <- loginUser username password
+    & do catchM @UserNotFoundError \_ -> do
+          liftIO (putStrLn "ERROR! USER NOT FOUND. Defaulting to 'Alice'.")
+          pure "Alice"
+    & do catchM @InvalidPassowrd \e -> do
+          liftIO (putStrLn "ERROR! INVALID PASSWORD.")
+          throwM e
+
+  liftIO (putStrLn name)
+```
 
 This library gives us all the benefits of Haskell's type system, forcing us to
 be explicit about all the possible errors we encounter, but doesn't force us to
