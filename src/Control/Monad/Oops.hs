@@ -185,7 +185,7 @@ throwNothingM :: ()
   => Monad m
   => Maybe a
   -> m a
-throwNothingM = maybe (throwM ()) pure
+throwNothingM = throwNothingAsM ()
 
 -- | When the expression of type 'Maybe a' evaluates to 'Nothing', throw the specified value,
 -- otherwise return 'a'.
