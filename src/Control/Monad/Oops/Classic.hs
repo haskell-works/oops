@@ -33,6 +33,7 @@ module Control.Monad.Oops.Classic
     Oops.runOops,
     Oops.suspendM,
 
+    Oops.catchAsLeftM,
     Oops.catchAndExitFailureM,
 
     Oops.throwLeftM,
