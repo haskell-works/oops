@@ -195,7 +195,7 @@ throwNothingAsM :: forall e es m a. ()
   => e
   -> Maybe a
   -> m a
-throwNothingAsM e ma = maybe (throwM e) pure ma
+throwNothingAsM e = maybe (throwM e) pure
 
 -- | Catch the specified exception and return it instead.
 -- The evaluated computation must return the same type that is being caught.
