@@ -36,6 +36,7 @@ module Control.Monad.Oops
 
     throwLeftM,
     throwNothingM,
+    throwNothingAsM,
 
     recoverM,
     recoverOrVoidM,
@@ -185,6 +186,16 @@ throwNothingM :: ()
   => Maybe a
   -> m a
 throwNothingM = maybe (throwM ()) pure
+
+-- | When the expression of type 'Maybe a' evaluates to 'Nothing', throw the specified value,
+-- otherwise return 'a'.
+throwNothingAsM :: forall e es m a. ()
+  => MonadError (Variant es) m
+  => CouldBe es e
+  => e
+  -> Maybe a
+  -> m a
+throwNothingAsM e ma = maybe (throwM e) pure ma
 
 -- | Catch the specified exception and return it instead.
 -- The evaluated computation must return the same type that is being caught.

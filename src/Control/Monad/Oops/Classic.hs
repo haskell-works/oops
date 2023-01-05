@@ -37,6 +37,7 @@ module Control.Monad.Oops.Classic
 
     Oops.throwLeftM,
     Oops.throwNothingM,
+    Oops.throwNothingAsM,
 
     Oops.recoverM,
     Oops.recoverOrVoidM,
