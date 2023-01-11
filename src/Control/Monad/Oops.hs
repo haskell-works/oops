@@ -35,11 +35,16 @@ module Control.Monad.Oops
     suspendM,
 
     catchAsLeftM,
+    catchAsNothingM,
     catchAndExitFailureM,
 
     throwLeftM,
     throwNothingM,
     throwNothingAsM,
+
+    throwPureLeftM,
+    throwPureNothingM,
+    throwPureNothingAsM,
 
     recoverM,
     recoverOrVoidM,
@@ -180,6 +185,14 @@ catchAsLeftM :: forall x e m a. ()
   -> ExceptT (Variant e) m (Either x a)
 catchAsLeftM = catchM @x (pure . Left) . fmap Right
 
+-- | Catch the specified exception and return the caught value as 'Left'.  If no
+-- value was caught, then return the returned value in 'Right'.
+catchAsNothingM :: forall x e m a. ()
+  => Monad m
+  => ExceptT (Variant (x : e)) m a
+  -> ExceptT (Variant e) m (Maybe a)
+catchAsNothingM = catchM @x (pure . (const Nothing)) . fmap Just
+
 -- | Catch the specified exception.  If that exception is caught, exit the program.
 catchAndExitFailureM :: forall x e m a. ()
   => MonadIO m
@@ -216,6 +229,35 @@ throwNothingAsM :: forall e es m a. ()
   -> Maybe a
   -> m a
 throwNothingAsM e = maybe (throwM e) pure
+
+-- | When the expression of type 'm (Either x a)' evaluates to 'pure (Left x)', throw the 'x',
+-- otherwise return 'a'.
+throwPureLeftM :: forall x e m a. ()
+  => MonadError (Variant e) m
+  => CouldBeF e x
+  => m (Either x a)
+  -> m a
+throwPureLeftM f = f >>= throwLeftM
+
+-- | When the expression of type 'Maybe a' evaluates to 'Nothing', throw '()',
+-- otherwise return 'a'.
+throwPureNothingM :: ()
+  => MonadError (Variant e) m
+  => CouldBeF e ()
+  => Monad m
+  => m (Maybe a)
+  -> m a
+throwPureNothingM f = f >>= throwNothingM
+
+-- | When the expression of type 'Maybe a' evaluates to 'Nothing', throw the specified value,
+-- otherwise return 'a'.
+throwPureNothingAsM :: forall e es m a. ()
+  => MonadError (Variant es) m
+  => CouldBe es e
+  => e
+  -> m (Maybe a)
+  -> m a
+throwPureNothingAsM e f = f >>= throwNothingAsM e
 
 -- | Catch the specified exception and return it instead.
 -- The evaluated computation must return the same type that is being caught.
