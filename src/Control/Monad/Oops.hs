@@ -30,6 +30,8 @@ module Control.Monad.Oops
     snatchM,
 
     runOops,
+    runOops0,
+    runOops1,
     suspendM,
 
     catchAsLeftM,
@@ -55,6 +57,7 @@ import Control.Monad.Error.Class (MonadError (..))
 import Control.Monad.Except (ExceptT(ExceptT))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Except (mapExceptT, runExceptT)
+import Data.Bifunctor (first)
 import Data.Function ((&))
 import Data.Functor.Identity (Identity (..))
 import Data.Variant (Catch, CatchF(..), CouldBe, CouldBeF(..), Variant, VariantF, preposterous)
@@ -152,6 +155,14 @@ runOops :: ()
   => ExceptT (Variant '[]) m a
   -> m a
 runOops f = either (absurd . preposterous) pure =<< runExceptT f
+
+-- | Convert an 'ExceptT (Variant '[])' expression to an 'ExceptT Void' expression
+runOops0 :: forall m a. Monad m => ExceptT (Variant '[]) m a -> ExceptT Void m a
+runOops0 = mapExceptT (fmap (first (absurd . preposterous)))
+
+-- | Convert an ExceptT (Variant '[x]) expression to an 'ExceptT x' expression
+runOops1 :: forall x m a. Monad m => ExceptT (Variant '[x]) m a -> ExceptT x m a
+runOops1 = mapExceptT (fmap (first DV.toEithers))
 
 -- | Suspend the 'ExceptT` monad transformer from the top of the stack so that the
 -- stack can be manipulated without the 'ExceptT` layer.
