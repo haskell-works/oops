@@ -46,6 +46,9 @@ module Control.Monad.Oops
     throwPureNothingM,
     throwPureNothingAsM,
 
+    leftM,
+    nothingM,
+
     recoverM,
     recoverOrVoidM,
 
@@ -258,6 +261,20 @@ throwPureNothingAsM :: forall e es m a. ()
   -> m (Maybe a)
   -> m a
 throwPureNothingAsM e f = f >>= throwNothingAsM e
+
+leftM :: forall x m a. ()
+  => Monad m
+  => (x -> m a)
+  -> m (Either x a)
+  -> m a
+leftM g f = f >>= either g pure
+
+nothingM :: forall m a. ()
+  => Monad m
+  => m a
+  -> m (Maybe a)
+  -> m a
+nothingM g f = f >>= maybe g pure
 
 -- | Catch the specified exception and return it instead.
 -- The evaluated computation must return the same type that is being caught.
