@@ -52,6 +52,9 @@ module Control.Monad.Oops
     recoverM,
     recoverOrVoidM,
 
+    fromEithersExceptT,
+    toEithersExceptT,
+
     DV.CouldBeF (..),
     DV.CouldBe  (..),
     DV.CouldBeAnyOfF,
@@ -65,7 +68,7 @@ import Control.Monad.Error.Class (MonadError (..))
 import Control.Monad.Except (ExceptT(ExceptT))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Except (mapExceptT, runExceptT)
-import Data.Bifunctor (first)
+import Data.Bifunctor (bimap, first)
 import Data.Function ((&))
 import Data.Functor.Identity (Identity (..))
 import Data.Variant (Catch, CatchF(..), CouldBe, CouldBeF(..), Variant, VariantF, preposterous)
@@ -73,6 +76,9 @@ import Data.Void (Void, absurd)
 
 import qualified Data.Variant as DV
 import qualified System.Exit  as IO
+
+-- $setup
+-- >>> :set -XDataKinds
 
 -- | When working in some monadic context, using 'catch' becomes trickier. The
 -- intuitive behaviour is that each 'catch' shrinks the variant in the left
@@ -292,3 +298,48 @@ recoverOrVoidM :: forall x e m. ()
   => ExceptT (Variant (x : e)) m Void
   -> ExceptT (Variant e) m x
 recoverOrVoidM f = either pure absurd =<< (fmap Right f & catchM @x (pure . Left))
+
+bimapExceptT :: ()
+  => Functor m
+  => (x -> y)
+  -> (a -> b)
+  -> ExceptT x m a
+  -> ExceptT y m b
+bimapExceptT f g = mapExceptT (fmap (bimap f g))
+
+firstExceptT :: ()
+  => Functor m
+  => (x -> y)
+  -> ExceptT x m a
+  -> ExceptT y m a
+firstExceptT f = bimapExceptT f id
+
+-- | Converts from ExceptT of eithers to ExceptT of Variant.
+--
+-- For example:
+--
+-- >>> :{
+--   example :: ExceptT (Either Int String) IO () -> ExceptT (Variant '[Int, String]) IO ()
+--   example = fromEithersExceptT
+-- :}
+fromEithersExceptT :: forall xs o m a. ()
+  => Functor m
+  => DV.Eithers xs o
+  => ExceptT o m a
+  -> ExceptT (Variant xs) m a
+fromEithersExceptT = firstExceptT DV.fromEithers
+
+-- | Converts from ExceptT of variant to ExceptT of eithers.
+--
+-- For example:
+--
+-- >>> :{
+--   example :: ExceptT (Variant '[Int, String]) IO () -> ExceptT (Either Int String) IO ()
+--   example = toEithersExceptT
+-- :}
+toEithersExceptT :: forall xs o m a. ()
+  => Functor m
+  => DV.Eithers xs o
+  => ExceptT (Variant xs) m a
+  -> ExceptT o m a
+toEithersExceptT = firstExceptT DV.toEithers

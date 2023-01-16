@@ -43,6 +43,9 @@ module Control.Monad.Oops.Classic
     Oops.recoverM,
     Oops.recoverOrVoidM,
 
+    Oops.fromEithersExceptT,
+    Oops.toEithersExceptT,
+
     DV.CouldBeF (..),
     DV.CouldBe  (..),
     DV.CouldBeAnyOfF,
@@ -54,7 +57,7 @@ module Control.Monad.Oops.Classic
 
 import Control.Monad.Error.Class (MonadError (..))
 import Control.Monad.Except (ExceptT(ExceptT))
-import Data.Variant ( Catch, CatchF, CouldBe, Variant, VariantF )
+import Data.Variant (Catch, CatchF, CouldBe, Variant, VariantF)
 
 import qualified Data.Variant       as DV
 import qualified Control.Monad.Oops as Oops
