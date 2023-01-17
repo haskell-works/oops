@@ -26,6 +26,7 @@ common Glob                           { build-depends: Glob                     
 common doctest                        { build-depends: doctest                        >= 0.16.2     && < 0.21   }
 common doctest-discover               { build-depends: doctest-discover               >= 0.2        && < 0.3    }
 common doctest-prop                   { build-depends: doctest-prop                   >= 0.2.0.1    && < 0.3    }
+common exceptions                     { build-depends: exceptions                                               }
 common hedgehog-quickcheck            { build-depends: hedgehog-quickcheck                                      }
 common hedgehog                       { build-depends: hedgehog                                                 }
 common hspec                          { build-depends: hspec                                                    }
@@ -42,6 +43,7 @@ common project-config
 
 library
   import:               base, project-config,
+                        exceptions,
                         mtl,
                         QuickCheck,
                         transformers,

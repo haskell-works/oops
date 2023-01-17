@@ -52,6 +52,9 @@ module Control.Monad.Oops
     recoverM,
     recoverOrVoidM,
 
+    onExceptionThrowM,
+    onExceptionM,
+
     DV.CouldBeF (..),
     DV.CouldBe  (..),
     DV.CouldBeAnyOfF,
@@ -71,8 +74,9 @@ import Data.Functor.Identity (Identity (..))
 import Data.Variant (Catch, CatchF(..), CouldBe, CouldBeF(..), Variant, VariantF, preposterous)
 import Data.Void (Void, absurd)
 
-import qualified Data.Variant as DV
-import qualified System.Exit  as IO
+import qualified Control.Monad.Catch as CMC
+import qualified Data.Variant        as DV
+import qualified System.Exit         as IO
 
 -- | When working in some monadic context, using 'catch' becomes trickier. The
 -- intuitive behaviour is that each 'catch' shrinks the variant in the left
@@ -292,3 +296,22 @@ recoverOrVoidM :: forall x e m. ()
   => ExceptT (Variant (x : e)) m Void
   -> ExceptT (Variant e) m x
 recoverOrVoidM f = either pure absurd =<< (fmap Right f & catchM @x (pure . Left))
+
+-- | Catch an exception of the specified type 'x' and throw it as an error
+onExceptionThrowM :: forall x e m a. ()
+  => CMC.MonadCatch m
+  => CMC.Exception x
+  => MonadError (Variant e) m
+  => CouldBeF e x
+  => m a
+  -> m a
+onExceptionThrowM = onExceptionM @x throwM
+
+-- | Catch an exception of the specified type 'x' and call the the handler 'h'
+onExceptionM :: forall x m a. ()
+  => CMC.MonadCatch m
+  => CMC.Exception x
+  => (x -> m a)
+  -> m a
+  -> m a
+onExceptionM h f = either h pure =<< CMC.try f
