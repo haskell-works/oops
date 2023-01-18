@@ -192,8 +192,8 @@ catchAsLeftM :: forall x e m a. ()
   -> ExceptT (Variant e) m (Either x a)
 catchAsLeftM = catchM @x (pure . Left) . fmap Right
 
--- | Catch the specified exception and return the caught value as 'Left'.  If no
--- value was caught, then return the returned value in 'Right'.
+-- | Catch the specified exception and return 'Nothing'.  If no
+-- value was caught, then return the returned value in 'Just'.
 catchAsNothingM :: forall x e m a. ()
   => Monad m
   => ExceptT (Variant (x : e)) m a
