@@ -144,16 +144,17 @@ Now, let's say we're calling this from another function that does some more
 contrived business logic:
 
 ```haskell
-import Control.Monad.Oops.Classic
+import Control.Monad.Oops
 
 renderProfile :: ()
   => e `CouldBe` NetworkError
   => Text
   -> ExceptT (Variant e) IO ()
 renderProfile username = do
-  name <- catchM @UserNotFoundError (getUser username) $ \_ -> do
-    liftIO (putStrLn "ERROR! USER NOT FOUND. Defaulting to 'Alice'.")
-    pure "Alice"
+  name <- getUser username
+    & do catch @UserNotFoundError $ \_ -> do
+            liftIO (putStrLn "ERROR! USER NOT FOUND. Defaulting to 'Alice'.")
+            pure "Alice"
 
   liftIO (putStrLn name)
 ```
@@ -162,10 +163,6 @@ Here, we've tried to call `getUser`, and handled the `UserNotFoundError`
 explicitly. You'll notice that, as a result, _this_ signature doesn't mention
 it! Thanks to some careful instance trickery, a `CouldBe` and a `Catch`
 constraint will actually cancel each other out!
-
-The non-classic version of `catchM` takes the handler first which us to
-use a combination of `(&)`, `do` and `BlockArguments` do stack handlers
-like this:
 
 ```haskell
 {-# LANGUAGE BlockArguments #-}
