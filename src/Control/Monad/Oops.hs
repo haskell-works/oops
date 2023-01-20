@@ -34,6 +34,7 @@ module Control.Monad.Oops
     runOops1,
     suspend,
 
+    catchOrMap,
     catchAsLeft,
     catchAsNothing,
     catchAndExitFailure,
@@ -67,7 +68,6 @@ import Control.Monad.Except (ExceptT(ExceptT))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Except (mapExceptT, runExceptT)
 import Data.Bifunctor (first)
-import Data.Function ((&))
 import Data.Functor.Identity (Identity (..))
 import Data.Variant (Catch, CatchF, CouldBe, CouldBeAnyOf, CouldBeAnyOfF, CouldBeF, Variant, VariantF)
 import Data.Void (Void, absurd)
@@ -184,11 +184,20 @@ suspend f = ExceptT . f . runExceptT
 
 -- | Catch the specified exception and return the caught value as 'Left'.  If no
 -- value was caught, then return the returned value in 'Right'.
+catchOrMap :: forall x a e' m b. Monad m
+  => (b -> a)
+  -> (x -> ExceptT (Variant e') m a)
+  -> ExceptT (Variant (x : e')) m b
+  -> ExceptT (Variant e') m a
+catchOrMap g h = catch h . fmap g
+
+-- | Catch the specified exception and return the caught value as 'Left'.  If no
+-- value was caught, then return the returned value in 'Right'.
 catchAsLeft :: forall x e m a. ()
   => Monad m
   => ExceptT (Variant (x : e)) m a
   -> ExceptT (Variant e) m (Either x a)
-catchAsLeft = catch @x (pure . Left) . fmap Right
+catchAsLeft = catchOrMap Right (pure . Left)
 
 -- | Catch the specified exception and return 'Nothing'.  If no
 -- value was caught, then return the returned value in 'Just'.
@@ -196,7 +205,7 @@ catchAsNothing :: forall x e m a. ()
   => Monad m
   => ExceptT (Variant (x : e)) m a
   -> ExceptT (Variant e) m (Maybe a)
-catchAsNothing = catch @x (pure . (const Nothing)) . fmap Just
+catchAsNothing = catchOrMap Just (pure . (const Nothing))
 
 -- | Catch the specified exception.  If that exception is caught, exit the program.
 catchAndExitFailure :: forall x e m a. ()
@@ -244,6 +253,7 @@ onNothingThrow :: forall e es m a. ()
   -> m a
 onNothingThrow e f = f >>= hoistMaybe e
 
+-- | Handle the 'Left' constructor of the returned 'Either'
 onLeft :: forall x m a. ()
   => Monad m
   => (x -> m a)
@@ -251,6 +261,7 @@ onLeft :: forall x m a. ()
   -> m a
 onLeft g f = f >>= either g pure
 
+-- | Handle the 'Nothing' constructor of the returned 'Maybe'
 onNothing :: forall m a. ()
   => Monad m
   => m a
@@ -265,7 +276,7 @@ recover :: forall x e m a. ()
   => (x -> a)
   -> ExceptT (Variant (x : e)) m a
   -> ExceptT (Variant e) m a
-recover g f = f & catch (pure . g)
+recover f = catch (pure . f)
 
 -- | Catch the specified exception and return it instead.  The evaluated computation
 -- must return `Void` (ie. it never returns)
@@ -273,7 +284,7 @@ recoverOrVoid :: forall x e m. ()
   => Monad m
   => ExceptT (Variant (x : e)) m Void
   -> ExceptT (Variant e) m x
-recoverOrVoid f = either pure absurd =<< (fmap Right f & catch @x (pure . Left))
+recoverOrVoid = catchOrMap @x absurd pure
 
 -- | Catch an exception of the specified type 'x' and throw it as an error
 onExceptionThrow :: forall x e m a. ()
