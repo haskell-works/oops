@@ -151,10 +151,9 @@ renderProfile :: ()
   => Text
   -> ExceptT (Variant e) IO ()
 renderProfile username = do
-  name <- getUser username
-    & do catch @UserNotFoundError $ \_ -> do
-            liftIO (putStrLn "ERROR! USER NOT FOUND. Defaulting to 'Alice'.")
-            pure "Alice"
+  name <- catch @UserNotFoundError (getUser username) $ \_ -> do
+    liftIO (putStrLn "ERROR! USER NOT FOUND. Defaulting to 'Alice'.")
+    pure "Alice"
 
   liftIO (putStrLn name)
 ```
@@ -178,10 +177,10 @@ renderProfile :: ()
   -> ExceptT (Variant es) IO ()
 renderProfile username password = do
   name <- loginUser username password
-    & do catchM @UserNotFoundError \_ -> do
+    & do catch @UserNotFoundError \_ -> do
           liftIO (putStrLn "ERROR! USER NOT FOUND. Defaulting to 'Alice'.")
           pure "Alice"
-    & do catchM @InvalidPassowrd \e -> do
+    & do catch @InvalidPassowrd \e -> do
           liftIO (putStrLn "ERROR! INVALID PASSWORD.")
           throwM e
 
