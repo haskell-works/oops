@@ -20,47 +20,45 @@
 
 module Control.Monad.Oops
   ( -- * MTL/transformer utilities
-    catchFM,
-    catchM,
+    catchF,
+    catch,
 
-    throwFM,
-    throwM,
+    throwF,
+    throw,
 
-    snatchFM,
-    snatchM,
+    snatchF,
+    snatch,
 
     runOops,
     runOops0,
     runOops1,
-    suspendM,
+    suspend,
 
-    catchAsLeftM,
-    catchAsNothingM,
-    catchAndExitFailureM,
+    catchAsLeft,
+    catchAsNothing,
+    catchAndExitFailure,
 
-    throwLeftM,
-    throwNothingM,
-    throwNothingAsM,
+    hoistEither,
+    hoistMaybe,
 
-    throwPureLeftM,
-    throwPureNothingM,
-    throwPureNothingAsM,
+    onLeftThrow,
+    onNothingThrow,
 
-    leftM,
-    nothingM,
+    onLeft,
+    onNothing,
 
-    recoverM,
-    recoverOrVoidM,
+    recover,
+    recoverOrVoid,
 
-    onExceptionThrowM,
-    onExceptionM,
+    onExceptionThrow,
+    onException,
 
-    DV.CouldBeF (..),
-    DV.CouldBe  (..),
+    DV.CouldBeF,
+    DV.CouldBe,
     DV.CouldBeAnyOfF,
     DV.CouldBeAnyOf,
     DV.Variant,
-    DV.VariantF(..),
+    DV.VariantF,
 
   ) where
 
@@ -71,7 +69,6 @@ import Control.Monad.Trans.Except (mapExceptT, runExceptT)
 import Data.Bifunctor (first)
 import Data.Function ((&))
 import Data.Functor.Identity (Identity (..))
-import Data.Variant (Catch, CatchF(..), CouldBe, CouldBeF(..), Variant, VariantF, preposterous)
 import Data.Void (Void, absurd)
 
 import qualified Control.Monad.Catch as CMC
@@ -87,231 +84,211 @@ import qualified System.Exit         as IO
 -- us to map over the error type and change it as we go. If the error we catch
 -- is the one in the variant that we want to handle, we pluck it out and deal
 -- with it. Otherwise, we "re-throw" the variant minus the one we've handled.
-catchFM :: forall x e e' f m a. ()
+catchF :: forall x e e' f m a. ()
   => Monad m
-  => CatchF x e e'
-  => (f x -> ExceptT (VariantF f e') m a)
-  -> ExceptT (VariantF f e ) m a
-  -> ExceptT (VariantF f e') m a
-catchFM recover xs = mapExceptT (>>= go) xs
+  => DV.CatchF x e e'
+  => (f x -> ExceptT (DV.VariantF f e') m a)
+  -> ExceptT (DV.VariantF f e ) m a
+  -> ExceptT (DV.VariantF f e') m a
+catchF h xs = mapExceptT (>>= go) xs
   where
     go = \case
       Right success -> pure (Right success)
-      Left  failure -> case catchF @x failure of
-        Right hit  -> runExceptT (recover hit)
+      Left  failure -> case DV.catchF @x failure of
+        Right hit  -> runExceptT (h hit)
         Left  miss -> pure (Left miss)
 
--- | Just the same as 'catchFM', but specialised for our plain 'Variant' and
+-- | Just the same as 'catchF', but specialised for our plain 'Variant' and
 -- sounding much less like a radio station.
-catchM :: forall x e e' m a. ()
+catch :: forall x e e' m a. ()
   => Monad m
-  => Catch x e e'
-  => (x -> ExceptT (Variant e') m a)
-  -> ExceptT (Variant e ) m a
-  -> ExceptT (Variant e') m a
-catchM recover xs
-  = catchFM (recover . runIdentity) xs
+  => DV.Catch x e e'
+  => (x -> ExceptT (DV.Variant e') m a)
+  -> ExceptT (DV.Variant e ) m a
+  -> ExceptT (DV.Variant e') m a
+catch h xs
+  = catchF (h . runIdentity) xs
 
--- | Same as 'catchFM' except the error is not removed from the type.
+-- | Same as 'catchF' except the error is not removed from the type.
 -- This is useful for writing recursive computations or computations that
 -- rethrow the same error type.
-snatchFM
+snatchF
   :: forall x e f m a. ()
   => Monad m
-  => e `CouldBe` x
-  => (f x -> ExceptT (VariantF f e) m a)
-  -> ExceptT (VariantF f e) m a
-  -> ExceptT (VariantF f e) m a
-snatchFM recover xs = mapExceptT (>>= go) xs
+  => e `DV.CouldBe` x
+  => (f x -> ExceptT (DV.VariantF f e) m a)
+  -> ExceptT (DV.VariantF f e) m a
+  -> ExceptT (DV.VariantF f e) m a
+snatchF h xs = mapExceptT (>>= go) xs
   where
     go = \case
       Right success -> pure (Right success)
-      Left  failure -> case snatchF @_ @_ @x failure of
-        Right hit  -> runExceptT (recover hit)
+      Left  failure -> case DV.snatchF @_ @_ @x failure of
+        Right hit  -> runExceptT (h hit)
         Left  miss -> pure (Left miss)
 
 
--- | Same as 'catchM' except the error is not removed from the type.
+-- | Same as 'catch' except the error is not removed from the type.
 -- This is useful for writing recursive computations or computations that
 -- rethrow the same error type.
-snatchM :: forall x e m a. ()
+snatch :: forall x e m a. ()
   => Monad m
-  => e `CouldBe` x
-  => (x -> ExceptT (Variant e) m a)
-  -> ExceptT (Variant e) m a
-  -> ExceptT (Variant e) m a
-snatchM recover xs = snatchFM (recover . runIdentity) xs
+  => e `DV.CouldBe` x
+  => (x -> ExceptT (DV.Variant e) m a)
+  -> ExceptT (DV.Variant e) m a
+  -> ExceptT (DV.Variant e) m a
+snatch h xs = snatchF (h . runIdentity) xs
 
 -- | Throw an error into a variant 'MonadError' context. Note that this /isn't/
 -- type-changing, so this can work for any 'MonadError', rather than just
 -- 'ExceptT'.
-throwFM :: forall x e f m a. ()
-  => MonadError (VariantF f e) m
-  => e `CouldBe` x
+throwF :: forall x e f m a. ()
+  => MonadError (DV.VariantF f e) m
+  => e `DV.CouldBe` x
   => f x
   -> m a
-throwFM = throwError . throwF
+throwF = throwError . DV.throwF
 
--- | Same as 'throwFM', but without the @f@ context. Given a value of some type
+-- | Same as 'throwF', but without the @f@ context. Given a value of some type
 -- within a 'Variant' within a 'MonadError' context, "throw" the error.
-throwM :: forall x e m a. ()
-  => MonadError (Variant e) m
-  => e `CouldBe` x
+throw :: forall x e m a. ()
+  => MonadError (DV.Variant e) m
+  => e `DV.CouldBe` x
   => x
   -> m a
-throwM = throwFM . Identity
+throw = throwF . Identity
 
--- | Add 'ExceptT (Variant '[])' to the monad transformer stack.
+-- | Add 'ExceptT (DV.Variant '[])' to the monad transformer stack.
 runOops :: ()
   => Monad m
-  => ExceptT (Variant '[]) m a
+  => ExceptT (DV.Variant '[]) m a
   -> m a
-runOops f = either (absurd . preposterous) pure =<< runExceptT f
+runOops f = either (absurd . DV.preposterous) pure =<< runExceptT f
 
--- | Convert an 'ExceptT (Variant '[])' expression to an 'ExceptT Void' expression
-runOops0 :: forall m a. Monad m => ExceptT (Variant '[]) m a -> ExceptT Void m a
-runOops0 = mapExceptT (fmap (first (absurd . preposterous)))
+-- | Convert an 'ExceptT (DV.Variant '[])' expression to an 'ExceptT Void' expression
+runOops0 :: forall m a. Monad m => ExceptT (DV.Variant '[]) m a -> ExceptT Void m a
+runOops0 = mapExceptT (fmap (first (absurd . DV.preposterous)))
 
--- | Convert an ExceptT (Variant '[x]) expression to an 'ExceptT x' expression
-runOops1 :: forall x m a. Monad m => ExceptT (Variant '[x]) m a -> ExceptT x m a
+-- | Convert an ExceptT (DV.Variant '[x]) expression to an 'ExceptT x' expression
+runOops1 :: forall x m a. Monad m => ExceptT (DV.Variant '[x]) m a -> ExceptT x m a
 runOops1 = mapExceptT (fmap (first DV.toEithers))
 
 -- | Suspend the 'ExceptT` monad transformer from the top of the stack so that the
 -- stack can be manipulated without the 'ExceptT` layer.
-suspendM :: forall x m a n b. ()
+suspend :: forall x m a n b. ()
   => (m (Either x a) -> n (Either x b))
   -> ExceptT x m a
   -> ExceptT x n b
-suspendM f = ExceptT . f . runExceptT
+suspend f = ExceptT . f . runExceptT
 
 -- | Catch the specified exception and return the caught value as 'Left'.  If no
 -- value was caught, then return the returned value in 'Right'.
-catchAsLeftM :: forall x e m a. ()
+catchAsLeft :: forall x e m a. ()
   => Monad m
-  => ExceptT (Variant (x : e)) m a
-  -> ExceptT (Variant e) m (Either x a)
-catchAsLeftM = catchM @x (pure . Left) . fmap Right
+  => ExceptT (DV.Variant (x : e)) m a
+  -> ExceptT (DV.Variant e) m (Either x a)
+catchAsLeft = catch @x (pure . Left) . fmap Right
 
 -- | Catch the specified exception and return 'Nothing'.  If no
 -- value was caught, then return the returned value in 'Just'.
-catchAsNothingM :: forall x e m a. ()
+catchAsNothing :: forall x e m a. ()
   => Monad m
-  => ExceptT (Variant (x : e)) m a
-  -> ExceptT (Variant e) m (Maybe a)
-catchAsNothingM = catchM @x (pure . (const Nothing)) . fmap Just
+  => ExceptT (DV.Variant (x : e)) m a
+  -> ExceptT (DV.Variant e) m (Maybe a)
+catchAsNothing = catch @x (pure . (const Nothing)) . fmap Just
 
 -- | Catch the specified exception.  If that exception is caught, exit the program.
-catchAndExitFailureM :: forall x e m a. ()
+catchAndExitFailure :: forall x e m a. ()
   => MonadIO m
-  => ExceptT (Variant (x : e)) m a
-  -> ExceptT (Variant e) m a
-catchAndExitFailureM = catchM @x (const (liftIO IO.exitFailure))
+  => ExceptT (DV.Variant (x : e)) m a
+  -> ExceptT (DV.Variant e) m a
+catchAndExitFailure = catch @x (const (liftIO IO.exitFailure))
 
 -- | When the expression of type 'Either x a' evaluates to 'Left x', throw the 'x',
 -- otherwise return 'a'.
-throwLeftM :: forall x e m a. ()
-  => MonadError (Variant e) m
-  => CouldBeF e x
+hoistEither :: forall x e m a. ()
+  => MonadError (DV.Variant e) m
+  => DV.CouldBeF e x
   => Monad m
   => Either x a
   -> m a
-throwLeftM = either throwM pure
-
--- | When the expression of type 'Maybe a' evaluates to 'Nothing', throw '()',
--- otherwise return 'a'.
-throwNothingM :: ()
-  => MonadError (Variant e) m
-  => CouldBeF e ()
-  => Monad m
-  => Maybe a
-  -> m a
-throwNothingM = throwNothingAsM ()
+hoistEither = either throw pure
 
 -- | When the expression of type 'Maybe a' evaluates to 'Nothing', throw the specified value,
 -- otherwise return 'a'.
-throwNothingAsM :: forall e es m a. ()
-  => MonadError (Variant es) m
-  => CouldBe es e
+hoistMaybe :: forall e es m a. ()
+  => MonadError (DV.Variant es) m
+  => DV.CouldBe es e
   => e
   -> Maybe a
   -> m a
-throwNothingAsM e = maybe (throwM e) pure
+hoistMaybe e = maybe (throw e) pure
 
 -- | When the expression of type 'm (Either x a)' evaluates to 'pure (Left x)', throw the 'x',
 -- otherwise return 'a'.
-throwPureLeftM :: forall x e m a. ()
-  => MonadError (Variant e) m
-  => CouldBeF e x
+onLeftThrow :: forall x e m a. ()
+  => MonadError (DV.Variant e) m
+  => DV.CouldBeF e x
   => m (Either x a)
   -> m a
-throwPureLeftM f = f >>= throwLeftM
-
--- | When the expression of type 'Maybe a' evaluates to 'Nothing', throw '()',
--- otherwise return 'a'.
-throwPureNothingM :: ()
-  => MonadError (Variant e) m
-  => CouldBeF e ()
-  => Monad m
-  => m (Maybe a)
-  -> m a
-throwPureNothingM f = f >>= throwNothingM
+onLeftThrow f = f >>= hoistEither
 
 -- | When the expression of type 'Maybe a' evaluates to 'Nothing', throw the specified value,
 -- otherwise return 'a'.
-throwPureNothingAsM :: forall e es m a. ()
-  => MonadError (Variant es) m
-  => CouldBe es e
+onNothingThrow :: forall e es m a. ()
+  => MonadError (DV.Variant es) m
+  => DV.CouldBe es e
   => e
   -> m (Maybe a)
   -> m a
-throwPureNothingAsM e f = f >>= throwNothingAsM e
+onNothingThrow e f = f >>= hoistMaybe e
 
-leftM :: forall x m a. ()
+onLeft :: forall x m a. ()
   => Monad m
   => (x -> m a)
   -> m (Either x a)
   -> m a
-leftM g f = f >>= either g pure
+onLeft g f = f >>= either g pure
 
-nothingM :: forall m a. ()
+onNothing :: forall m a. ()
   => Monad m
   => m a
   -> m (Maybe a)
   -> m a
-nothingM g f = f >>= maybe g pure
+onNothing g f = f >>= maybe g pure
 
 -- | Catch the specified exception and return it instead.
 -- The evaluated computation must return the same type that is being caught.
-recoverM :: forall x e m a. ()
+recover :: forall x e m a. ()
   => Monad m
   => (x -> a)
-  -> ExceptT (Variant (x : e)) m a
-  -> ExceptT (Variant e) m a
-recoverM g f = f & catchM (pure . g)
+  -> ExceptT (DV.Variant (x : e)) m a
+  -> ExceptT (DV.Variant e) m a
+recover g f = f & catch (pure . g)
 
 -- | Catch the specified exception and return it instead.  The evaluated computation
 -- must return `Void` (ie. it never returns)
-recoverOrVoidM :: forall x e m. ()
+recoverOrVoid :: forall x e m. ()
   => Monad m
-  => ExceptT (Variant (x : e)) m Void
-  -> ExceptT (Variant e) m x
-recoverOrVoidM f = either pure absurd =<< (fmap Right f & catchM @x (pure . Left))
+  => ExceptT (DV.Variant (x : e)) m Void
+  -> ExceptT (DV.Variant e) m x
+recoverOrVoid f = either pure absurd =<< (fmap Right f & catch @x (pure . Left))
 
 -- | Catch an exception of the specified type 'x' and throw it as an error
-onExceptionThrowM :: forall x e m a. ()
+onExceptionThrow :: forall x e m a. ()
   => CMC.MonadCatch m
   => CMC.Exception x
-  => MonadError (Variant e) m
-  => CouldBeF e x
+  => MonadError (DV.Variant e) m
+  => DV.CouldBeF e x
   => m a
   -> m a
-onExceptionThrowM = onExceptionM @x throwM
+onExceptionThrow = onException @x throw
 
 -- | Catch an exception of the specified type 'x' and call the the handler 'h'
-onExceptionM :: forall x m a. ()
+onException :: forall x m a. ()
   => CMC.MonadCatch m
   => CMC.Exception x
   => (x -> m a)
   -> m a
   -> m a
-onExceptionM h f = either h pure =<< CMC.try f
+onException h f = either h pure =<< CMC.try f
