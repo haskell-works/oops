@@ -30,9 +30,10 @@ module Control.Monad.Oops
     snatch,
 
     runOops,
-    runOops0,
-    runOops1,
+    runOopsInExceptT,
+    runOopsInEither,
     suspend,
+
 
     catchOrMap,
     catchAsLeft,
@@ -166,13 +167,16 @@ runOops :: ()
   -> m a
 runOops f = either (absurd . DV.preposterous) pure =<< runExceptT f
 
--- | Convert an 'ExceptT (Variant '[])' expression to an 'ExceptT Void' expression
-runOops0 :: forall m a. Monad m => ExceptT (Variant '[]) m a -> ExceptT Void m a
-runOops0 = mapExceptT (fmap (first (absurd . DV.preposterous)))
+-- | Run an oops expression that throws one error in an ExceptT.
+runOopsInExceptT :: forall x m a. Monad m => ExceptT (Variant '[x]) m a -> ExceptT x m a
+runOopsInExceptT = mapExceptT (fmap (first DV.toEithers))
 
--- | Convert an ExceptT (Variant '[x]) expression to an 'ExceptT x' expression
-runOops1 :: forall x m a. Monad m => ExceptT (Variant '[x]) m a -> ExceptT x m a
-runOops1 = mapExceptT (fmap (first DV.toEithers))
+-- | Run an oops expression that throws one error in an Either.
+--
+-- This function can also be implemented this way (which could be instructive for implementing
+-- your own combinators)
+runOopsInEither :: forall x m a. Monad m => ExceptT (Variant '[x]) m a -> m (Either x a)
+runOopsInEither = runExceptT . mapExceptT (fmap (first DV.toEithers))
 
 -- | Suspend the 'ExceptT` monad transformer from the top of the stack so that the
 -- stack can be manipulated without the 'ExceptT` layer.
