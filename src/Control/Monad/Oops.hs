@@ -2,17 +2,13 @@
 {-# LANGUAGE BlockArguments         #-}
 {-# LANGUAGE ConstraintKinds        #-}
 {-# LANGUAGE DataKinds              #-}
-{-# LANGUAGE EmptyCase              #-}
 {-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
-{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GADTs                  #-}
-{-# LANGUAGE InstanceSigs           #-}
 {-# LANGUAGE LambdaCase             #-}
 {-# LANGUAGE PolyKinds              #-}
 {-# LANGUAGE RankNTypes             #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
-{-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE TypeApplications       #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE TypeOperators          #-}
@@ -92,7 +88,7 @@ catchF :: forall x e e' f m a. ()
   => (f x -> ExceptT (VariantF f e') m a)
   -> ExceptT (VariantF f e ) m a
   -> ExceptT (VariantF f e') m a
-catchF h xs = mapExceptT (>>= go) xs
+catchF h = mapExceptT (>>= go)
   where
     go = \case
       Right success -> pure (Right success)
@@ -108,8 +104,7 @@ catch :: forall x e e' m a. ()
   => (x -> ExceptT (Variant e') m a)
   -> ExceptT (Variant e ) m a
   -> ExceptT (Variant e') m a
-catch h xs
-  = catchF (h . runIdentity) xs
+catch h = catchF (h . runIdentity)
 
 -- | Same as 'catchF' except the error is not removed from the type.
 -- This is useful for writing recursive computations or computations that
@@ -121,7 +116,7 @@ snatchF
   => (f x -> ExceptT (VariantF f e) m a)
   -> ExceptT (VariantF f e) m a
   -> ExceptT (VariantF f e) m a
-snatchF h xs = mapExceptT (>>= go) xs
+snatchF h = mapExceptT (>>= go)
   where
     go = \case
       Right success -> pure (Right success)
@@ -139,7 +134,7 @@ snatch :: forall x e m a. ()
   => (x -> ExceptT (Variant e) m a)
   -> ExceptT (Variant e) m a
   -> ExceptT (Variant e) m a
-snatch h xs = snatchF (h . runIdentity) xs
+snatch h = snatchF (h . runIdentity)
 
 -- | Throw an error into a variant 'MonadError' context. Note that this /isn't/
 -- type-changing, so this can work for any 'MonadError', rather than just
@@ -209,7 +204,7 @@ catchAsNothing :: forall x e m a. ()
   => Monad m
   => ExceptT (Variant (x : e)) m a
   -> ExceptT (Variant e) m (Maybe a)
-catchAsNothing = catchOrMap Just (pure . (const Nothing))
+catchAsNothing = catchOrMap Just (pure . const Nothing)
 
 -- | Catch the specified exception.  If that exception is caught, exit the program.
 catchAndExitFailure :: forall x e m a. ()
