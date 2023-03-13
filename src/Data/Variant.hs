@@ -7,7 +7,6 @@
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GADTs                  #-}
-{-# LANGUAGE InstanceSigs           #-}
 {-# LANGUAGE LambdaCase             #-}
 {-# LANGUAGE PolyKinds              #-}
 {-# LANGUAGE RankNTypes             #-}
@@ -154,7 +153,7 @@ variantF here there = \case Here x -> here x; There xs -> there xs
 -- >>> variant Left Right (There (Here (Identity 3)) :: Variant '[Bool, Int])
 -- Right (Here (Identity 3))
 variant :: (x -> r) -> (Variant xs -> r) -> Variant (x ': xs) -> r
-variant here there = variantF (here . runIdentity) there
+variant here = variantF (here . runIdentity)
 
 class CaseF (xs :: [Type]) (f :: Type -> Type) (r :: Type) (o :: Type)
     | xs f r -> o, o -> f r xs where
@@ -293,7 +292,7 @@ type family All (cs :: [Constraint]) = (c :: Constraint) | c -> cs where
   All (c ': cs) = (c, All cs)
 
 type family Map (f :: k -> l) (xs :: [k]) = (ys :: [l]) where
-  Map f (x ': xs) = f x ': (Map f xs)
+  Map f (x ': xs) = f x ': Map f xs
   Map f '[] = '[]
 
 -- | As with 'CouldBeAnyOf', we can also constrain a variant to represent
