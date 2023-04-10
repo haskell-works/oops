@@ -15,7 +15,7 @@
 {-# LANGUAGE UndecidableInstances   #-}
 
 module Control.Monad.Oops
-  ( -- * MTL/transformer utilities
+  ( -- * Catching and throwing exceptions
     catchF,
     catch,
 
@@ -25,38 +25,44 @@ module Control.Monad.Oops
     snatchF,
     snatch,
 
+    -- * Typeclasses to describe oops-style errors
+    CouldBeF,
+    CouldBe,
+    CouldBeAnyOfF,
+    CouldBeAnyOf,
+
+    -- * Variant type to carry oops-style errors
+    Variant,
+    VariantF,
+
+    -- * Embedding code with oops-style error handling into other code
     runOops,
     runOopsInExceptT,
     runOopsInEither,
     suspend,
 
-
+    -- * Error handling
     catchOrMap,
     catchAsLeft,
     catchAsNothing,
     catchAndExitFailure,
 
-    hoistEither,
-    hoistMaybe,
+    recover,
+    recoverOrVoid,
+
+    -- * Converting error values to oops-style error handling
+    onLeft,
+    onNothing,
 
     onLeftThrow,
     onNothingThrow,
 
-    onLeft,
-    onNothing,
+    hoistEither,
+    hoistMaybe,
 
-    recover,
-    recoverOrVoid,
-
+    -- * Converting exceptions to oops-style error handling
     onExceptionThrow,
     onException,
-
-    CouldBeF,
-    CouldBe,
-    CouldBeAnyOfF,
-    CouldBeAnyOf,
-    Variant,
-    VariantF,
 
   ) where
 
