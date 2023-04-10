@@ -223,7 +223,7 @@ catchAndExitFailure = catch @x (const (liftIO IO.exitFailure))
 -- otherwise return 'a'.
 hoistEither :: forall x e m a. ()
   => MonadError (Variant e) m
-  => CouldBeF e x
+  => e `CouldBe` x
   => Monad m
   => Either x a
   -> m a
@@ -243,7 +243,7 @@ hoistMaybe e = maybe (throw e) pure
 -- otherwise return 'a'.
 onLeftThrow :: forall x e m a. ()
   => MonadError (Variant e) m
-  => CouldBeF e x
+  => e `CouldBe` x
   => m (Either x a)
   -> m a
 onLeftThrow f = f >>= hoistEither
@@ -296,7 +296,7 @@ onExceptionThrow :: forall x e m a. ()
   => CMC.MonadCatch m
   => CMC.Exception x
   => MonadError (Variant e) m
-  => CouldBeF e x
+  => e `CouldBe` x
   => m a
   -> m a
 onExceptionThrow = onException @x throw
