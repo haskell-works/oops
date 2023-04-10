@@ -6,9 +6,7 @@ defaults:
 
 on:
   push:
-    branches:
-      - main
-  pull_request:
+  merge_group:
 
 jobs:
   build:
@@ -20,6 +18,17 @@ jobs:
         ghc: ["9.4.4", "9.2.5", "9.0.2", "8.10.7"]
         cabal: ["3.8.1.0"]
         os: [ubuntu-latest]
+
+    concurrency:
+      group: >
+        a+${{ github.event_name }}
+        b+${{ github.workflow_ref }}
+        c+${{ github.job }}
+        d+${{ matrix.ghc }}
+        e+${{ matrix.cabal }}
+        f+${{ matrix.os }}
+        g+${{ (startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && github.run_id) || github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
 
     steps:
       - uses: actions/checkout@v2
