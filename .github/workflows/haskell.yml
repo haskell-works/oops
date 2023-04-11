@@ -6,8 +6,6 @@ defaults:
 
 on:
   push:
-    branches:
-      - main
   merge_group:
 
 jobs:
