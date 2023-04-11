@@ -157,7 +157,6 @@ example3 s = OO.runOops $ do
   i <- readInt s
     & OO.catch @Text (\_ -> pure 0)
   liftIO $ IO.print i
-  OO.throw True
   return i
   where
     readInt :: ()
