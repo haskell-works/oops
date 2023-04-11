@@ -192,6 +192,76 @@ be explicit about all the possible errors we encounter, but doesn't force us to
 stick to a concrete error stack throughout. Our code is less fragile, our
 functions are decoupled, and error-handling is actually bearable!
 
+## Examples
+Many [examples](examples/src/Examples.hs) can be found in the `oops-example` package.
+
+## Troubleshooting
+
+### Type inference
+Type-inference generally works, however the types inferred may not be the simplest or
+may be more generic than your needs.
+
+For example the following:
+
+```haskell
+readInt :: (MonadError (Variant e) m, CouldBeF e Text) => String -> m Int
+```
+
+Can be simplified to one of the following:
+
+```haskell
+readInt :: (MonadError (Variant e) m, CouldBe e Text) => String -> m Int
+readInt :: (MonadError (Variant e) m, e `CouldBe` Text) => String -> m Int
+readInt :: (MonadError (Variant e) IO, e `CouldBe` Text) => String -> IO Int
+readInt :: e `CouldBe` Text => String -> ExceptT (Variant e) m Int
+readInt :: e `CouldBe` Text => String -> ExceptT (Variant e) IO Int
+```
+
+### Understanding error messages
+
+If you get the following error:
+
+```
+• Could not deduce (OO.CouldBeF e MyErrorType)
+    arising from a use of ‘OO.throw’
+  from the context: (MonadError (Variant e) m, OO.CouldBeF e Text)
+    bound by the type signature for:
+               readIntV1 :: forall (e :: [*]) (m :: * -> *).
+                            (MonadError (Variant e) m, OO.CouldBeF e Text) =>
+                            String -> m Int
+    at /Users/jky/wrk/haskell-works/oops/examples/src/Examples.hs:(27,1)-(31,10)
+```
+
+It means the function body is throwing `MyErrorType` and the function doesn't have
+the constraint to declare the error propagates to the caller.
+
+In this case you have two choices:
+
+* Add the constraint to the function's type signature to propage the error to
+  the caller.
+* Catch the exception in the function body and handle it.  The handler can
+  return a fallback value or throw an error of another type.
+
+If you get the following error:
+
+```
+• Uh oh! I couldn't find MyErrorType inside the variant!
+  If you're pretty sure I'm wrong, perhaps the variant type is ambiguous;
+  could you add some annotations?
+```
+
+It means the expression under `runOops` or similar throws an error that is not
+handled.
+
+In this case you have two choices:
+
+* Swap `runOops` or similar for something else that catches the uncaught error.
+
+* Catch the exception in the function body and handle it.  The handler can
+  return a fallback value or throw an error of the type caught by the `runOops`
+  equvalent.  Note `runOops` itself catches no errors, so in this case all
+  errors must be handled.
+
 ## Credits
 
 This library is heavily based on the original [oops library](https://github.com/i-am-tom/oops) by Tom Harding. 
