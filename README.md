@@ -262,6 +262,10 @@ In this case you have two choices:
   equvalent.  Note `runOops` itself catches no errors, so in this case all
   errors must be handled.
 
+For further examples of compile errors when using `oops` and how to fix them,
+see the [troubleshooting](https://github.com/haskell-works/oops/wiki/Troubleshooting)
+page.
+
 ## Credits
 
 This library is heavily based on the original [oops library](https://github.com/i-am-tom/oops) by Tom Harding. 
