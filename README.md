@@ -262,9 +262,17 @@ In this case you have two choices:
   equvalent.  Note `runOops` itself catches no errors, so in this case all
   errors must be handled.
 
-For further examples of compile errors when using `oops` and how to fix them,
+## Resources
+
+For examples of `oops` code, see the [`Examples.hs` file](https://github.com/haskell-works/oops/blob/main/examples/src/Examples.hs).
+
+For examples of compile errors when using `oops` and how to fix them,
 see the [troubleshooting](https://github.com/haskell-works/oops/wiki/Troubleshooting)
 page.
+
+## Projects using `oops`
+
+* [`cabal-cache`](https://github.com/haskell-works/cabal-cache)
 
 ## Credits
 
