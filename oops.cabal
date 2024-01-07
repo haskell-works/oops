@@ -23,7 +23,7 @@ common base                           { build-depends: base                     
 
 common base-compat                    { build-depends: base-compat                    >= 0.10.5     && < 0.14   }
 common Glob                           { build-depends: Glob                           >= 0.10.2     && < 0.11   }
-common doctest                        { build-depends: doctest                        >= 0.16.2     && < 0.22   }
+common doctest                        { build-depends: doctest                        >= 0.16.2     && < 0.23   }
 common doctest-discover               { build-depends: doctest-discover               >= 0.2        && < 0.3    }
 common doctest-prop                   { build-depends: doctest-prop                   >= 0.2.0.1    && < 0.3    }
 common exceptions                     { build-depends: exceptions                                               }

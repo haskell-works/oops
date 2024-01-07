@@ -1,4 +1,4 @@
-name: Build
+name: Binaries
 
 defaults:
   run:
@@ -6,7 +6,9 @@ defaults:
 
 on:
   push:
-  merge_group:
+    branches:
+      - main
+  pull_request:
 
 jobs:
   build:
@@ -15,35 +17,33 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: ["9.4.4", "9.2.5", "9.0.2", "8.10.7"]
-        cabal: ["3.8.1.0"]
-        os: [ubuntu-latest]
+        ghc: ["9.8.1", "9.6.3", "9.4.8", "9.2.8", "9.0.2", "8.10.7"]
+        os: [ubuntu-latest, macOS-latest, windows-latest]
+        exclude:
+        - os: windows-latest
+          ghc: "9.4.2"
 
-    concurrency:
-      group: >
-        a+${{ github.event_name }}
-        b+${{ github.workflow_ref }}
-        c+${{ github.job }}
-        d+${{ matrix.ghc }}
-        e+${{ matrix.cabal }}
-        f+${{ matrix.os }}
-        g+${{ (startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && github.run_id) || github.event.pull_request.number || github.ref }}
-      cancel-in-progress: true
+    env:
+      # Modify this value to "invalidate" the cabal cache.
+      CABAL_CACHE_VERSION: "2024-01-05"
 
     steps:
       - uses: actions/checkout@v2
 
-      - uses: input-output-hk/setup-haskell@v1
+      - uses: haskell-actions/setup@v2
         id: setup-haskell
         with:
           ghc-version: ${{ matrix.ghc }}
-          cabal-version: ${{ matrix.cabal }}
+          cabal-version: '3.10.2.1'
+
+      - name: Set some window specific things
+        if: matrix.os == 'windows-latest'
+        run: echo 'EXE_EXT=.exe' >> $GITHUB_ENV
 
       - name: Configure project
         run: |
-          cabal update
-          cabal configure --enable-tests --enable-benchmarks --write-ghc-environment-files=always
-          cabal build all --dry-run
+          cabal configure --enable-tests --enable-benchmarks --write-ghc-environment-files=ghc8.4.4+
+          cabal build all --enable-tests --enable-benchmarks --dry-run
 
       - name: Cabal cache over S3
         uses: action-works/cabal-cache-s3@v1
@@ -55,7 +55,7 @@ jobs:
           dist-dir: dist-newstyle
           store-path: ${{ steps.setup-haskell.outputs.cabal-store }}
           threads: 16
-          archive-uri: ${{ secrets.BINARY_CACHE_URI }}
+          archive-uri: ${{ secrets.BINARY_CACHE_URI }}/${{ env.CABAL_CACHE_VERSION }}/${{ runner.os }}/${{ matrix.cabal }}/${{ matrix.ghc }}
           skip: "${{ secrets.BINARY_CACHE_URI == '' }}"
 
       - name: Cabal cache over HTTPS
@@ -64,14 +64,14 @@ jobs:
           dist-dir: dist-newstyle
           store-path: ${{ steps.setup-haskell.outputs.cabal-store }}
           threads: 16
-          archive-uri: https://cache.haskellworks.io/archive
+          archive-uri: https://cache.haskellworks.io/${{ env.CABAL_CACHE_VERSION }}/${{ runner.os }}/${{ matrix.cabal }}/${{ matrix.ghc }}
           skip: "${{ secrets.BINARY_CACHE_URI != '' }}"
 
       - name: Build
-        run: cabal build all
+        run: cabal build all --enable-tests --enable-benchmarks
 
       - name: Test
-        run: cabal test all
+        run: cabal test all --enable-tests --enable-benchmarks
 
   check:
     needs: build
@@ -81,11 +81,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-
-      - uses: input-output-hk/setup-haskell@v1
-        id: setup-haskell
-        with:
-          cabal-version: 3.8.1.0
 
       - name: Check if cabal project is sane
         run: |
